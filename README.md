@@ -186,7 +186,3 @@ app/main.py     FastAPI endpoints
 static/index.html  UI: chat, swarm trace, vis-network graph, Why? path explorer
 ```
 
-## AI assistance disclosure
-
-Built with help from Claude Code (an AI coding assistant). At runtime the agents use open-weight models served by Groq. The design, the graph model and the queries were
-reviewed and tested by the author, who can explain all of them.
