@@ -185,4 +185,5 @@ app/seed.py     The town of Emberfall (demo: sessions 1-2 pre-played; fresh: bla
 app/main.py     FastAPI endpoints
 static/index.html  UI: chat, swarm trace, vis-network graph, Why? path explorer
 ```
-
+## AI Assist coding
+Claude code used to build some parts of the project to speed up the process
