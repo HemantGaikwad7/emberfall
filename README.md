@@ -2,6 +2,10 @@
 
 **Track: 02, Agent Memory & Coordination** · Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB)
 
+🎮 **Live demo:** https://emberfall-d55v.onrender.com/ · 🎬 **Video:** https://youtu.be/kyxHE9RDE-0?si=IZ3vXQ2UOuJQIFqb · ✍️ **Blog post:** https://emberfallai.hashnode.dev/she-refused-because-i-insulted-her-brother-two-sessions-ago-building-ai-npcs-with-graph-memory
+
+> The live demo runs on free tiers: the first visit after idle can take about 50 s to wake up.
+
 Three AI agents run a tabletop RPG together: a **Narrator**, **NPC agents** and a **World-keeper**. They share one
 FalkorDB graph of characters, places, items, factions, past events and their own decisions. NPCs remember what
 the players did to them, *and to their family*, sessions ago, and the world stays consistent.
@@ -26,7 +30,7 @@ rules and no way to coordinate.
 | **Semantic memory** | `(npc)-[:FEELS {score}]->(player)` attitudes recomputed on each event; LLM session recaps on `(:Session).summary` |
 | **Procedural memory** | `(:Rule)-[:GOVERNS]->(faction or npc)` codes that NPCs must apply; world rules the World-keeper enforces |
 | **Persistent conversation history** | `(:Message)-[:IN_SESSION]->(:Session)`, sessions chained by `[:NEXT]` |
-| **Shared state & handoffs** | Narrator → NPC (`talk_to_npc`) and Narrator → World-keeper (`propose_world_change`). Handoffs carry only intent; every agent reads state from the graph itself |
+| **Shared state & handoffs** | Narrator → NPC (`talk_to_npc`) and Narrator → World-keeper (`travel`, `propose_world_change`). Handoffs carry only intent; every agent reads state from the graph itself |
 | **Memory that updates over time** | Graph traversal spreads gossip: target → witnesses at the location → kin → faction-mates, with decaying weight |
 | **Separate memory per tenant** | Each campaign is its own FalkorDB graph (`dnd_<campaign>`). Turns are serialized per campaign, and campaigns run in parallel |
 | **Traceable decisions** | `(:Decision)-[:BASED_ON]->(:Event)`, `-[:APPLIED]->(:Rule)`. NPCs can only cite events that exist in *their* memory; fabricated IDs are dropped |
@@ -37,7 +41,7 @@ rules and no way to coordinate.
 flowchart LR
   P[Player] -->|action| N[Narrator agent]
   N -->|talk_to_npc handoff| NPC[NPC agent<br/>persona + own memories]
-  N -->|propose_world_change handoff| WK[World-keeper agent<br/>validates rules, commits]
+  N -->|travel / propose_world_change handoff| WK[World-keeper agent<br/>validates rules, commits]
   NPC -->|reads REMEMBERS, FEELS, KIN_OF, Rules<br/>writes Decision| G[(FalkorDB<br/>shared world graph)]
   WK -->|reads facts and rules<br/>writes Event, moves, transfers,<br/>propagates memory| G
   N -->|reads scene, history, recaps| G
@@ -46,19 +50,23 @@ flowchart LR
 
 Each turn: the Narrator reads the scene and history from the graph. It hands off to the NPC agent, which decides
 from its own memory subgraph and writes a `Decision` linked to the evidence. It then hands off to the World-keeper,
-which validates the proposed changes (location, ownership, liveness, roads) and commits them. The UI shows every
-handoff and every Cypher query in the **swarm trace**.
+which validates the proposed changes (location, ownership, liveness, roads) and commits them. Travel is routed along
+the shortest road path in the graph. The UI shows every handoff and every Cypher query in the **swarm trace**.
 
 Agents run on **Groq** (free tier; default model `openai/gpt-oss-120b`, set by `GROQ_MODEL`) through a manual
 tool-calling loop in [app/agents.py](app/agents.py). The whole stack is free: FalkorDB (open source, or the free
-FalkorDB Cloud tier) plus a free Groq API key. **Without a key** the same graph flow runs through a deterministic
-offline rules engine, so the demo always works.
+FalkorDB Cloud tier) plus a free Groq API key.
+
+**Resilience:** each Groq model has its own free daily quota. When one is rate-limited the agents switch to the next
+model in `GROQ_FALLBACK_MODELS` (default `openai/gpt-oss-20b`, then `qwen/qwen3.8-27b`). If every model is exhausted,
+or no key is set, the same graph flow runs through a deterministic offline rules engine, so the demo never breaks.
+The header badge shows which model answered each turn.
 
 ## Graph data model
 
 ```
-(:Player {id, name, description})
-(:NPC {id, name, role, persona, alive})
+(:Player {id, name, pronouns, description})
+(:NPC {id, name, pronouns, role, persona, alive})
 (:Location {id, name, description})
 (:Item {id, name})
 (:Faction {id, name})
@@ -129,13 +137,14 @@ MATCH (n:NPC {id:$nid}) MATCH (r:Rule)-[:GOVERNS]->(t)
 WHERE t = n OR (n)-[:MEMBER_OF]->(t) RETURN r.id, r.text
 ```
 
-**Consistency writes**, which return zero rows when invalid so the World-keeper rejects the change:
+**Consistency checks**, which return zero rows when a change is invalid so the World-keeper rejects it:
 ```cypher
-// travel: shortest road route, rejected if no road connects the two places
+// travel: shortest road route (FalkorDB has no undirected shortestPath yet, so order a variable-length match)
 MATCH (p:Player {id:$pid})-[:LOCATED_AT]->(a:Location), (b:Location {id:$lid})
 MATCH path = (a)-[:CONNECTED_TO*1..8]-(b)
 RETURN [n IN nodes(path) | n.name] AS route, length(path) AS hops ORDER BY hops ASC LIMIT 1
 
+// gifts and trades: only succeed if the giver really owns the item
 MATCH (from {id:$from_id})-[o:OWNS]->(i:Item {id:$item_id}), (to {id:$to_id})
 DELETE o CREATE (to)-[:OWNS]->(i) RETURN i.name
 ```
@@ -160,6 +169,29 @@ uvicorn app.main:app --port 8000
 The first page load seeds a demo campaign. **Load demo** resets it; **New fresh campaign** creates a new tenant graph
 starting at session 1 with no history.
 
+### Option C: deploy for free (Render + FalkorDB Cloud)
+1. Create a free instance at [FalkorDB Cloud](https://app.falkordb.cloud) and note its host, port, username and password.
+2. On [Render](https://render.com) choose **New → Blueprint** and select this repo. [render.yaml](render.yaml) builds the
+   Dockerfile.
+3. Fill in the secrets Render asks for: `GROQ_API_KEY`, `FALKORDB_HOST`, `FALKORDB_PORT`, `FALKORDB_USERNAME`,
+   `FALKORDB_PASSWORD` (and `FALKORDB_SSL=true` if your instance uses TLS).
+
+### Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GROQ_API_KEY` | (empty) | Free key from [console.groq.com](https://console.groq.com/keys). Empty means offline rules engine |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Main model |
+| `GROQ_FALLBACK_MODELS` | `openai/gpt-oss-20b,qwen/qwen3.8-27b` | Tried in order when a model hits its rate limit |
+| `GROQ_REASONING_EFFORT` | `low` | Reasoning effort for gpt-oss models (low is fastest) |
+| `FALKORDB_HOST` / `FALKORDB_PORT` | `localhost` / `6379` | Graph database |
+| `FALKORDB_USERNAME` / `FALKORDB_PASSWORD` / `FALKORDB_SSL` | (empty) | For FalkorDB Cloud |
+| `FALKORDB_URL` | (empty) | Alternative to the above as one connection URL |
+| `DND_OFFLINE` | (empty) | Set to `1` to force the offline rules engine |
+
+Behind a corporate proxy that inspects HTTPS, the app uses the operating system's certificate store (`truststore`),
+so calls to Groq still work.
+
 ## Demo script (about 2 minutes)
 
 1. **Load demo.** The session chips show recaps of sessions 1 and 2 (hover them). Kael is in Emberfall Square.
@@ -168,8 +200,8 @@ starting at session 1 with no history.
    She **REFUSES** and names the session 1 insult to her brother.
 4. Click **🔍 Why?** The graph dims and the gold path lights up: Kael → S1 insult → Borin → KIN_OF(brother) → Grimma,
    with the Kin-oath rule and the Cypher that found it.
-5. Switch to **Lyra** and ask the same thing. She has no history with the Ironroots, so Grimma deals with her.
-   Memory is per player.
+5. *(Optional)* Switch the player dropdown to **Lyra**, say *"go to the Rusty Anvil"*, and ask the same thing. She has
+   no history with the Ironroots, so Grimma treats her differently. Memory is per player.
 6. *"go to Ironroot Mine"*. The World-keeper routes Kael along the shortest road path (Anvil → Square → Old Mill Road
    → Mine). Then *"Borin, I am truly sorry for that song. Please take this Pouch of 50 Gold as amends."* The World-keeper
    commits the apology, the gift and the item transfer, and the memory spreads to Grimma through `KIN_OF`.
@@ -179,11 +211,17 @@ starting at session 1 with no history.
 ## Repo layout
 
 ```
-app/graph.py    FalkorDB layer: every Cypher query, memory propagation, tenant-per-graph
-app/agents.py   Narrator / NPC / World-keeper agents, handoffs, offline engine, explain()
-app/seed.py     The town of Emberfall (demo: sessions 1-2 pre-played; fresh: blank history)
-app/main.py     FastAPI endpoints
-static/index.html  UI: chat, swarm trace, vis-network graph, Why? path explorer
+app/graph.py         FalkorDB layer: every Cypher query, memory propagation, tenant-per-graph
+app/agents.py        Narrator / NPC / World-keeper agents, handoffs, Groq model fallback, offline engine, explain()
+app/seed.py          The town of Emberfall (demo: sessions 1-2 pre-played; fresh: blank history)
+app/main.py          FastAPI endpoints
+static/index.html    UI: chat, swarm trace, vis-network graph, Why? path explorer
+static/vendor/       vis-network (bundled so the UI needs no CDN)
+docs/DEMO_SCRIPT.md  Script for the demo video
+docs/BLOG.md         Blog post about the project
+Dockerfile, docker-compose.yml, render.yaml   Container, local stack, free cloud deploy
 ```
-## AI Assist coding
-Claude code used to build some parts of the project to speed up the process
+
+## AI assistance disclosure
+
+Built with help from Claude Code (an AI coding assistant).
