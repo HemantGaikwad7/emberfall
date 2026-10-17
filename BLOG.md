@@ -8,7 +8,7 @@ tags: falkordb, ai, agents, graphdatabase
 *How I built a swarm of AI game masters that share one memory graph, and why the graph, not the LLM, ended up being the interesting part.*
 
 > Built for **Graph Hacks: Context for AI Agents** (WeMakeDevs × FalkorDB), Track 02: Agent Memory & Coordination.
-> 🎮 Live demo: `<YOUR_RENDER_URL>` · 💻 Code: `<YOUR_GITHUB_URL>` · 🎬 Video: `<YOUR_VIDEO_URL>`
+> 🎮 Live demo: (https://emberfall-d55v.onrender.com/) · 💻 Code: https://github.com/HemantGaikwad7/emberfall · 🎬 Video: https://youtu.be/kyxHE9RDE-0?si=IZ3vXQ2UOuJQIFqb
 
 ---
 
@@ -30,7 +30,8 @@ Kael ─PERFORMED→ [S1: mocked Borin in song] ─TARGETED→ Borin ─KIN_OF(b
 
 This isn't the LLM explaining itself after the fact. It's a Cypher query over the facts that drove her decision. That moment is the whole project in one image: **agents that remember, coordinate, and can show their work.**
 
-![The Why? path highlighted in the graph](<SCREENSHOT_WHY_PATH>)
+<img width="470" height="371" alt="image" src="https://github.com/user-attachments/assets/b1b3be05-b9ec-4b80-b3bd-ac5aff7917c9" />
+
 
 ## The problem with LLM memory
 
@@ -125,7 +126,8 @@ The **same `KIN_OF` edge** that carried the insult to Grimma now carries the apo
 
 No special-case code. Just memory flowing through relationships.
 
-![Grimma helps after amends](<SCREENSHOT_HELP>)
+<img width="646" height="408" alt="image" src="https://github.com/user-attachments/assets/14cbcc00-069f-4d54-afc9-ba7684aa604c" />
+
 
 ## Keeping the world honest
 
@@ -158,12 +160,9 @@ Each campaign is its own FalkorDB graph (`dnd_<campaign>`), so memory never leak
 
 ## Try it
 
-- 🎮 Play: `<YOUR_RENDER_URL>`. Click **Load demo**, then use the suggestion buttons.
-- 💻 Code and full Cypher: `<YOUR_GITHUB_URL>`
-- 🎬 2-minute demo: `<YOUR_VIDEO_URL>`
+- 🎮 Play: https://emberfall-d55v.onrender.com/. Click **Load demo**, then use the suggestion buttons.
+- 💻 Code and full Cypher: https://github.com/HemantGaikwad7/emberfall
+- 🎬 2-minute demo: https://youtu.be/kyxHE9RDE-0?si=IZ3vXQ2UOuJQIFqb
 
 Insult someone's brother. See how long they remember.
 
----
-
-*Built for Graph Hacks by WeMakeDevs × FalkorDB. I used Claude Code as an AI coding assistant; the design and the graph model are explained above, and I can walk through every query.*
