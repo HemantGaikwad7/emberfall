@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberfall GM Swarm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="/static/vendor/vis-network.min.js"></script>
+<style>
+:root{
+  --bg:#14110f; --panel:#1d1916; --panel2:#25201c; --line:#3a322b; --ink:#efe6da; --muted:#a8998a;
+  --gold:#e0b04f; --narrator:#b48cf2; --npc:#f0a35e; --wk:#6fcf97; --player:#7fb6ff; --bad:#ef6b6b; --good:#6fcf97;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{font:700 20px Cinzel,serif;margin:0;color:var(--gold);letter-spacing:.5px}
+.sub{color:var(--muted);font-size:12px}
+.spacer{flex:1}
+button,select,input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button{cursor:pointer} button:hover{border-color:var(--gold)}
+button.primary{background:var(--gold);color:#1a1408;border-color:var(--gold);font-weight:600}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.badge.llm{color:var(--good);border-color:var(--good)} .badge.offline{color:var(--npc);border-color:var(--npc)}
+main{display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,1.25fr);height:calc(100% - 57px)}
+#left{display:flex;flex-direction:column;border-right:1px solid var(--line);min-height:0}
+#sessions{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+.chip{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap;cursor:help}
+.chip.active{border-color:var(--gold);color:var(--gold)}
+#log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{padding:8px 12px;border-radius:10px;background:var(--panel);border-left:3px solid var(--line);max-width:100%}
+.msg .who{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.msg.narrator{border-color:var(--narrator)} .msg.narrator .who{color:var(--narrator)}
+.msg.npc{border-color:var(--npc)} .msg.npc .who{color:var(--npc)}
+.msg.player{border-color:var(--player);background:#1b2230} .msg.player .who{color:var(--player)}
+.msg.sys{border-color:var(--wk);color:var(--muted);font-size:12px}
+.decision{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:12px}
+.verdict{font-weight:700;padding:1px 8px;border-radius:6px}
+.verdict.refuse{background:#4a1f1f;color:var(--bad)} .verdict.help{background:#1d3a2a;color:var(--good)}
+.verdict.negotiate,.verdict.neutral{background:#3a3220;color:var(--gold)}
+.why{background:transparent;border-color:var(--gold);color:var(--gold);padding:2px 10px;font-size:12px}
+details.trace{font-size:12px;background:#17140f;border:1px dashed var(--line);border-radius:8px;padding:4px 10px}
+details.trace summary{cursor:pointer;color:var(--muted)}
+.step{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #221d18;align-items:baseline}
+.step .tag{flex:0 0 auto;font-size:10px;font-weight:700;padding:0 6px;border-radius:4px;text-transform:uppercase}
+.tag.narrator{background:#2e2340;color:var(--narrator)} .tag.npc{background:#3d2a18;color:var(--npc)}
+.tag.wk{background:#1b3326;color:var(--wk)} .tag.db{background:#222;color:#bbb}
+.step code{font:11px "JetBrains Mono",monospace;color:#cbbfae;word-break:break-word}
+#composer{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+#composer .row{display:flex;gap:8px}
+#composer input{flex:1}
+.hints{display:flex;gap:6px;flex-wrap:wrap}
+.hint{font-size:12px;padding:2px 9px;border-radius:99px;background:transparent;color:var(--muted)}
+#right{display:flex;flex-direction:column;min-height:0}
+#gbar{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
+#gbar label{display:flex;gap:4px;align-items:center}
+#net{flex:1;min-height:300px}
+#explain{border-top:1px solid var(--line);padding:12px 14px;max-height:45%;overflow-y:auto;display:none;background:var(--panel)}
+#explain h3{margin:0 0 6px;font:600 15px Cinzel,serif;color:var(--gold)}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0}
+.node{padding:3px 9px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);font-size:12px}
+.node.Player{border-color:var(--player)} .node.NPC{border-color:var(--npc)} .node.Event{border-color:var(--bad)} .node.Faction{border-color:var(--narrator)}
+.rel{font:10px "JetBrains Mono",monospace;color:var(--gold)}
+pre.cy{font:11px/1.4 "JetBrains Mono",monospace;background:#120f0c;padding:8px;border-radius:6px;white-space:pre-wrap;color:#cbbfae}
+.spinner{display:inline-block;width:10px;height:10px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (max-width:900px){main{grid-template-columns:1fr;height:auto} #left{height:80vh} #net{height:60vh}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚒ Emberfall</h1>
+  <span class="sub">A game-master swarm sharing one FalkorDB memory graph</span>
+  <span id="mode" class="badge">…</span>
+  <span class="spacer"></span>
+  <select id="campaign" title="Each campaign is its own graph (tenant)"></select>
+  <button id="seedDemo" title="Sessions 1-2 already played">Load demo (session 3)</button>
+  <button id="seedFresh" title="Session 1, no history">New fresh campaign</button>
+  <button id="endSession" class="primary">End session ⏭</button>
+</header>
+<main>
+  <section id="left">
+    <div id="sessions"></div>
+    <div id="log"></div>
+    <div id="composer">
+      <div class="hints" id="hints"></div>
+      <div class="row">
+        <select id="player"></select>
+        <input id="text" placeholder="What do you do?" autocomplete="off">
+        <button id="send" class="primary">Act</button>
+      </div>
+    </div>
+  </section>
+  <section id="right">
+    <div id="gbar">
+      <strong style="color:var(--ink)">World graph</strong>
+      <label><input type="checkbox" id="showEvents" checked> events &amp; memories</label>
+      <label><input type="checkbox" id="showDecisions" checked> decisions</label>
+      <label><input type="checkbox" id="showRules"> rules</label>
+      <span class="spacer"></span>
+      <button id="clearHl" style="display:none">Clear highlight</button>
+    </div>
+    <div id="net"></div>
+    <div id="explain"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const api = (p, o) => fetch(p, o).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
+let C = localStorage.getItem('campaign') || 'emberfall';
+let network, graphData, highlight = null;
+
+const HINTS = {
+  demo: ['go to the Rusty Anvil', 'Grimma, I need a moonsteel blade to kill the thing in your mine. Will you forge one?',
+         'go to Ironroot Mine',
+         'Borin, I am truly sorry for that song. Please take this Pouch of 50 Gold as amends.',
+         'Grimma, I have made amends with your brother Borin. Will you forge the moonsteel blade now?'],
+  fresh: ['Borin, you soot-faced tunnel rat, buy me a drink', 'Tess, thank you for the warm hearth', 'go to Emberfall Square']
+};
+
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function loadCampaigns() {
+  const list = await api('/api/campaigns');
+  if (!list.length) { await api(`/api/campaigns/${C}/seed?mode=demo`, {method:'POST'}); return loadCampaigns(); }
+  if (!list.includes(C)) C = list[0];
+  $('#campaign').innerHTML = list.map(c => `<option ${c===C?'selected':''}>${c}</option>`).join('');
+}
+
+async function loadState() {
+  const s = await api(`/api/campaigns/${C}/state`);
+  $('#mode').textContent = s.mode === 'llm' ? `LLM swarm · ${s.model}` : 'offline rules engine';
+  $('#mode').className = 'badge ' + s.mode;
+  const cur = $('#player').value;
+  $('#player').innerHTML = s.players.map(p => `<option value="${p.id}">${esc(p.name)} @ ${esc(p.location)}</option>`).join('');
+  if (cur) $('#player').value = cur;
+  $('#sessions').innerHTML = s.sessions.map(x =>
+    `<span class="chip ${x.status==='active'?'active':''}" title="${esc(x.summary || 'in progress')}">Session ${x.number}${x.status==='active'?' · now':''}</span>`).join('');
+  $('#log').innerHTML = '';
+  s.history.forEach(m => addMsg(m.agent, m.speaker, m.text));
+  const demo = s.sessions.length >= 3;
+  $('#hints').innerHTML = (demo ? HINTS.demo : HINTS.fresh).map(h => `<button class="hint">${esc(h)}</button>`).join('');
+  document.querySelectorAll('.hint').forEach(b => b.onclick = () => { if ($('#send').disabled) return; $('#text').value = b.textContent; act(); });
+}
+
+function addMsg(agent, who, text) {
+  const el = document.createElement('div');
+  el.className = 'msg ' + ({narrator:'narrator', npc:'npc', player:'player'}[agent] || 'sys');
+  el.innerHTML = `<div class="who">${esc(who)}</div><div>${esc(text)}</div>`;
+  $('#log').appendChild(el); $('#log').scrollTop = 1e9;
+  return el;
+}
+
+function tagFor(agent=''){ return agent.startsWith('npc') ? 'npc' : agent === 'world-keeper' ? 'wk' : 'narrator'; }
+
+function renderTrace(trace) {
+  const steps = trace.map(s => {
+    if (s.type === 'cypher') return `<div class="step"><span class="tag db">FalkorDB</span><code>${esc(s.name)} · ${s.rows} rows · ${s.ms}ms</code></div>`;
+    if (s.type === 'handoff') return `<div class="step"><span class="tag ${tagFor(s.to)}">handoff</span><span>${esc(s.frm)} → <b>${esc(s.to)}</b>: ${esc(s.text)}</span></div>`;
+    if (s.type === 'tool') return `<div class="step"><span class="tag ${tagFor(s.agent)}">${esc(s.agent)}</span><code>${esc(s.name)}(${esc(JSON.stringify(s.input))})</code></div>`;
+    if (s.type === 'decision') return `<div class="step"><span class="tag npc">decision</span><span>${esc(s.npc)} → <b>${esc(s.verdict)}</b>: ${esc(s.reasoning)}</span></div>`;
+    if (s.type === 'ledger') return `<div class="step"><span class="tag wk">ledger</span><code>${esc(s.ledger.map(l => l.op + (l.description ? ': '+l.description : l.reason ? ': '+l.reason : l.to ? ' → '+l.to : l.item ? ': '+l.item : '')).join(' | ') || 'nothing to commit')}</code></div>`;
+    if (s.type === 'blocked') return `<div class="step"><span class="tag wk">blocked</span><span>${esc(s.text)}</span></div>`;
+    return `<div class="step"><span class="tag ${tagFor(s.agent)}">${esc(s.agent)}</span><span>${esc(s.text)}</span></div>`;
+  }).join('');
+  const n = trace.filter(s => s.type === 'cypher').length, h = trace.filter(s => s.type === 'handoff').length;
+  return `<details class="trace"><summary>🧵 swarm trace: ${h} handoffs · ${n} graph queries</summary>${steps}</details>`;
+}
+
+async function act() {
+  const text = $('#text').value.trim(); if (!text) return;
+  const pid = $('#player').value, pname = $('#player').selectedOptions[0].textContent.split(' @')[0];
+  $('#text').value = ''; addMsg('player', pname, text);
+  const wait = addMsg('sys', 'swarm', ''); wait.querySelector('div:last-child').innerHTML = '<span class="spinner"></span> Narrator, NPC and World-keeper are conferring…';
+  $('#send').disabled = true;
+  try {
+    const r = await api(`/api/campaigns/${C}/turn`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({player_id: pid, text})});
+    wait.remove();
+    $('#mode').textContent = r.mode === 'offline' ? 'offline rules engine' : `LLM swarm · ${r.mode}`;
+    $('#mode').className = 'badge ' + (r.mode === 'offline' ? 'offline' : 'llm');
+    r.decisions.forEach(d => {
+      const el = addMsg('npc', d.npc, d.dialogue);
+      el.insertAdjacentHTML('beforeend', `<div class="decision"><span class="verdict ${d.verdict}">${d.verdict.toUpperCase()}</span>
+        <span class="sub">${esc(d.reasoning)}</span>${d.explainable ? `<button class="why" data-id="${d.decision_id}">🔍 Why? show the path</button>` : ''}</div>`);
+    });
+    const n = addMsg('narrator', 'Narrator', r.narration);
+    n.insertAdjacentHTML('beforeend', renderTrace(r.trace));
+    bindWhy(); await loadGraph(); await refreshPlayers();
+  } catch (e) { wait.querySelector('div:last-child').textContent = 'Error: ' + e.message; }
+  $('#send').disabled = false;
+}
+
+async function refreshPlayers() {
+  const s = await api(`/api/campaigns/${C}/state`); const cur = $('#player').value;
+  $('#player').innerHTML = s.players.map(p => `<option value="${p.id}">${esc(p.name)} @ ${esc(p.location)}</option>`).join('');
+  $('#player').value = cur;
+}
+
+function bindWhy(){ document.querySelectorAll('.why').forEach(b => b.onclick = () => explain(b.dataset.id)); }
+
+async function explain(did) {
+  const x = await api(`/api/campaigns/${C}/explain/${did}`);
+  highlight = { nodes: new Set(), edges: new Set(), did };
+  x.paths.forEach(p => { p.nodes.forEach(n => highlight.nodes.add(n._node)); p.edges.forEach(e => highlight.edges.add(e._edge)); });
+  const best = x.paths[0];
+  const chain = best ? best.nodes.map((n, i) => {
+    const label = n.labels[0], name = n.name || n.description;
+    const rel = best.edges[i] ? `<span class="rel">—${best.edges[i].type}${best.edges[i].relation ? ' ('+best.edges[i].relation+')' : ''}→</span>` : '';
+    return `<span class="node ${label}">${label === 'Event' ? '📜 S'+n.session+': ' : ''}${esc(name)}</span>${rel}`;
+  }).join('') : '<span class="sub">No path from the player to this NPC; the decision rests on first-hand memory.</span>';
+  $('#explain').style.display = 'block';
+  $('#explain').innerHTML = `<h3>Why did ${esc(x.npc)} ${esc(x.verdict)} ${esc(x.player)}?</h3>
+    <div class="sub">Session ${x.session} request: “${esc(x.request)}”</div>
+    <div class="chain">${chain}</div>
+    <div><b>Memories cited:</b> ${x.events.map(e => `S${e.session}: ${esc(e.what)} <span class="sub">(learned via ${esc(e.via)})</span>`).join('; ')}</div>
+    ${x.rules.length ? `<div style="margin-top:4px"><b>Code applied:</b> ${x.rules.map(esc).join(' ')}</div>` : ''}
+    <div style="margin-top:4px"><b>NPC reasoning:</b> ${esc(x.reasoning)}</div>
+    <details style="margin-top:6px"><summary class="sub">Cypher that produced this path</summary><pre class="cy">${esc(x.cypher)}</pre></details>`;
+  $('#clearHl').style.display = '';
+  await loadGraph();
+}
+
+const COLORS = {Player:'#7fb6ff', NPC:'#f0a35e', Location:'#8c7a63', Item:'#d7c38a', Faction:'#b48cf2', Event:'#ef6b6b', Session:'#5a5048', Decision:'#e0b04f', Rule:'#6fcf97'};
+async function loadGraph() {
+  graphData = await api(`/api/campaigns/${C}/graph`);
+  const showE = $('#showEvents').checked, showD = $('#showDecisions').checked, showR = $('#showRules').checked;
+  const hidden = new Set(['Session', ...(showE?[]:['Event']), ...(showD?[]:['Decision']), ...(showR?[]:['Rule'])]);
+  const keep = new Map();
+  graphData.nodes.forEach(n => { if (!hidden.has(n.labels[0])) keep.set(n._node, n); });
+  if (highlight) graphData.nodes.forEach(n => { if (n.id === highlight.did) { highlight.nodes.add(n._node); keep.set(n._node, n); } });
+  const dim = highlight ? .15 : 1;
+  const nodes = [...keep.values()].map(n => {
+    const lab = n.labels[0], on = !highlight || highlight.nodes.has(n._node);
+    let text = n.name || (lab === 'Event' ? 'S'+n.session+': '+(n.description||'').slice(0, 28)+'…' : lab === 'Decision' ? n.verdict : lab === 'Rule' ? (n.text||'').slice(0,24)+'…' : n.id);
+    return { id: n._node, label: text, title: n.description || n.text || n.persona || n.reasoning || lab,
+      shape: lab === 'Event' ? 'diamond' : lab === 'Decision' ? 'star' : lab === 'Location' ? 'box' : 'dot',
+      size: lab === 'Event' ? 10 : lab === 'Decision' ? 14 : 16,
+      color: { background: COLORS[lab] || '#999', border: on && highlight ? '#fff' : COLORS[lab] || '#999' },
+      opacity: on ? 1 : dim, borderWidth: on && highlight ? 3 : 1,
+      font: { color: on ? '#efe6da' : 'rgba(239,230,218,.2)', size: 12, face: 'Inter' } };
+  });
+  const edges = graphData.edges.filter(e => keep.has(e.src) && keep.has(e.dst)).map(e => {
+    const on = highlight && (highlight.edges.has(e._edge) || (e.type === 'BASED_ON' && highlight.nodes.has(e.src) && highlight.nodes.has(e.dst)) || (e.type === 'MADE' && highlight.nodes.has(e.dst) && highlight.nodes.has(e.src)));
+    return { id: e._edge, from: e.src, to: e.dst, arrows: 'to', label: on || !highlight ? e.type + (e.relation ? ' ('+e.relation+')' : '') : '',
+      width: on ? 4 : 1, color: { color: on ? '#e0b04f' : highlight ? 'rgba(120,110,100,.15)' : '#5d5248' },
+      font: { color: on ? '#e0b04f' : '#8b7f72', size: 9, strokeWidth: 0, face: 'JetBrains Mono' } };
+  });
+  const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+  if (!network) {
+    network = new vis.Network($('#net'), data, { physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -60, springLength: 110 }, stabilization: { iterations: 200 } }, interaction: { hover: true } });
+  } else network.setData(data);
+  if (highlight) setTimeout(() => network.fit({ nodes: [...highlight.nodes].filter(id => keep.has(id)), animation: true }), 400);
+}
+
+$('#send').onclick = act;
+$('#text').addEventListener('keydown', e => { if (e.key === 'Enter') act(); });
+$('#campaign').onchange = async e => { C = e.target.value; localStorage.setItem('campaign', C); highlight = null; await loadState(); await loadGraph(); };
+['#showEvents', '#showDecisions', '#showRules'].forEach(s => $(s).onchange = loadGraph);
+$('#clearHl').onclick = () => { highlight = null; $('#explain').style.display = 'none'; $('#clearHl').style.display = 'none'; loadGraph(); };
+$('#seedDemo').onclick = async () => { await api(`/api/campaigns/${C}/seed?mode=demo`, {method:'POST'}); highlight = null; $('#explain').style.display='none'; await loadState(); await loadGraph(); };
+$('#seedFresh').onclick = async () => {
+  const name = prompt('Name for the new campaign (a-z, 0-9, -):', 'table-' + Math.random().toString(36).slice(2, 6)); if (!name) return;
+  await api(`/api/campaigns/${name}/seed?mode=fresh`, {method:'POST'}); C = name; localStorage.setItem('campaign', C);
+  highlight = null; await loadCampaigns(); await loadState(); await loadGraph(); };
+$('#endSession').onclick = async () => {
+  const b = $('#endSession'); b.disabled = true; b.textContent = 'World-keeper summarising…';
+  try { const r = await api(`/api/campaigns/${C}/end-session`, {method:'POST'});
+    await loadState(); addMsg('sys', `Session ${r.closed} recap (stored in graph)`, r.summary); }
+  finally { b.disabled = false; b.textContent = 'End session ⏭'; } };
+
+(async () => { await loadCampaigns(); await loadState(); await loadGraph(); })();
+</script>
+</body>
+</html>

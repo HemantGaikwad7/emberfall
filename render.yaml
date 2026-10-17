@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: emberfall
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/queries
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false        # paste in the Render dashboard
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_FALLBACK_MODELS
+        value: openai/gpt-oss-20b,qwen/qwen3.8-27b
+      - key: FALKORDB_HOST
+        sync: false        # from FalkorDB Cloud
+      - key: FALKORDB_PORT
+        sync: false
+      - key: FALKORDB_USERNAME
+        sync: false
+      - key: FALKORDB_PASSWORD
+        sync: false
+      - key: FALKORDB_SSL
+        value: "false"     # set "true" if your FalkorDB Cloud instance requires TLS

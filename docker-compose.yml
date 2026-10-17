@@ -1,0 +1,22 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"   # graph
+      - "3001:3000"   # FalkorDB Browser UI
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_REASONING_EFFORT: ${GROQ_REASONING_EFFORT:-low}
+    depends_on:
+      - falkordb
+volumes:
+  falkordb-data:
